@@ -246,28 +246,35 @@
       URL.revokeObjectURL(url);
     }
 
-    let parsedData = null;
-    function loadData(url) {
-      return fetch(url).then(resp => {
+    function loadData(url, timeout = 5000) {
+      const fetchPromise = fetch(url).then(resp => {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.text();
       });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('请求超时')), timeout)
+      );
+
+      // Promise.race：先完成的 resolve/reject 就决定最终结果
+      return Promise.race([fetchPromise, timeoutPromise]);
     }
 
-    loadData(primaryUrl)
+    loadData(primaryUrl, 5000)  // 5 秒超时
       .then(text => {
         parsedData = parseTextToRows(text);
         renderTable(document.getElementById('tableWrap'), parsedData);
       })
       .catch(err => {
         console.warn('主链接加载失败，尝试备用链接：', err);
-        loadData(fallbackUrl)
+        loadData(fallbackUrl, 5000) // 备用链接也加超时
           .then(text => {
             parsedData = parseTextToRows(text);
             renderTable(document.getElementById('tableWrap'), parsedData);
           })
           .catch(err2 => {
-            document.getElementById('tableWrap').textContent = '读取文件失败（主/备用链接均失败）：' + err2;
+            document.getElementById('tableWrap').textContent =
+              '读取文件失败（主/备用链接均失败）：' + err2;
           });
       });
 
