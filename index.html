@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>复古风格表格（自动读取文件）</title>
+  <style>
+    body {
+      background: linear-gradient(#efe6d6, #f7f1e6);
+      font-family: "Georgia", "Times New Roman", serif;
+      color: #2b2b2b;
+      padding: 32px;
+    }
+
+    .card {
+      max-width: 980px;
+      margin: 0 auto;
+      background: linear-gradient(#fffdf8, #fbf6ec);
+      border: 1px solid rgba(60, 40, 20, 0.15);
+      box-shadow: 0 8px 24px rgba(40, 30, 20, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+      border-radius: 10px;
+      padding: 22px;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 22px;
+      letter-spacing: 1px;
+      color: #3b2b1f;
+      text-align: center;
+    }
+
+    p.lead {
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: #574635;
+      font-size: 14px;
+    }
+
+    /* 按钮容器右上角 */
+    .top-right-buttons {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn {
+      background: linear-gradient(#f3e2b8, #e8c77a);
+      border: 1px solid rgba(80, 50, 20, 0.15);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.08);
+      font-size: 13px;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: none;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      margin-top: 50px;
+      /* 给按钮留出空间 */
+      border-radius: 6px;
+      padding: 8px;
+      background: linear-gradient(#fbf7ef, #fbf5ee);
+      border: 1px solid rgba(60, 40, 20, 0.06);
+    }
+
+    table.vintage {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 680px;
+      font-size: 14px;
+      font-size: 16px;
+      /* 原 14px 改大 */
+      font-weight: 500;
+      /* 文字稍微加粗 */
+    }
+
+    table.vintage thead th {
+      background: linear-gradient(#e9d7b0, #e0c58a);
+      color: #2b1f10;
+      padding: 10px 12px;
+      border: 1px solid rgba(60, 40, 20, 0.12);
+      text-align: left;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+    }
+
+    table.vintage tbody td {
+      padding: 10px 12px;
+      border: 1px solid rgba(60, 40, 20, 0.06);
+      background: linear-gradient(transparent, rgba(240, 230, 200, 0.03));
+    }
+
+    table.vintage tbody tr:nth-child(odd) td {
+      background: linear-gradient(rgba(255, 255, 255, 0.02), transparent);
+    }
+
+    caption {
+      caption-side: bottom;
+      text-align: right;
+      padding-top: 8px;
+      font-size: 12px;
+      color: #6b5a46;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #7b6a56;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>GaussView 原子判断成键上限阈值(Angstrom)</h1>
+    <pre class="lead">
+      比如C-C原子之间: C      C       1.7956   1.4476   1.3860   1.2474
+      无键:     d > 1.7956 
+      单键:     1.7956 >= d > 1.4476
+      共振键:   1.4476 >= d > 1.3860
+      双键:     1.3860 >= d > 1.2474
+      三键:     d <= 1.2474
+      </pre>
+
+    <!-- 按钮固定右上角 -->
+    <div class="top-right-buttons">
+      <button class="btn" id="copyBtn">复制 CSV</button>
+      <button class="btn" id="downloadBtn">下载 CSV</button>
+    </div>
+
+    <div class="table-wrap" id="tableWrap" aria-live="polite">
+      读取中...
+    </div>
+
+    <div class="hint">提示：第一行以 <code>#</code> 开头将作为表头；列以任意空白字符分隔。</div>
+  </div>
+
+  <script>
+    const fileUrl = 'GaussVewBonds.txt'; // 固定文本链接
+
+    function parseTextToRows(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length === 0) return { header: [], rows: [] };
+
+      let header = null;
+      let startIndex = 0;
+      if (lines[0].startsWith('#')) {
+        header = lines[0].replace(/^#\s*/, '').trim().split(/\s+/);
+        startIndex = 1;
+      } else {
+        header = lines[0].split(/\s+/);
+        startIndex = 1;
+      }
+
+      const rows = [];
+      for (let i = startIndex; i < lines.length; i++) {
+        const cols = lines[i].split(/\s+/);
+        while (cols.length < header.length) cols.push('');
+        rows.push(cols);
+      }
+      return { header, rows };
+    }
+
+    function renderTable(container, parsed) {
+      if (!parsed.header || parsed.header.length === 0) {
+        container.innerHTML = '<div class="hint">找不到表头，请确保文本第一行以 <code>#</code> 开头并包含列名。</div>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'vintage';
+      const thead = document.createElement('thead');
+      const trh = document.createElement('tr');
+      parsed.header.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        trh.appendChild(th);
+      });
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      parsed.rows.forEach(row => {
+        const tr = document.createElement('tr');
+        for (let i = 0; i < parsed.header.length; i++) {
+          const td = document.createElement('td');
+          td.textContent = row[i] !== undefined ? row[i] : '';
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      const caption = document.createElement('caption');
+      caption.textContent = `共 ${parsed.rows.length} 条记录`;
+      table.appendChild(caption);
+
+      container.innerHTML = '';
+      container.appendChild(table);
+    }
+
+    function rowsToCSV(parsed) {
+      const esc = s => '"' + String(s).replace(/"/g, '""') + '"';
+      const header = parsed.header.map(esc).join(',');
+      const body = parsed.rows.map(r => parsed.header.map((_, i) => esc(r[i] ?? '')).join(',')).join('\n');
+      return header + '\n' + body;
+    }
+
+    function copyCSV(parsed) {
+      const csv = rowsToCSV(parsed);
+      navigator.clipboard.writeText(csv).then(() => alert('已复制 CSV 到剪贴板'));
+    }
+
+    function downloadCSV(parsed) {
+      const csv = rowsToCSV(parsed);
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'table.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    let parsedData = null;
+
+    fetch(fileUrl)
+      .then(resp => resp.text())
+      .then(text => {
+        parsedData = parseTextToRows(text);
+        renderTable(document.getElementById('tableWrap'), parsedData);
+      })
+      .catch(err => {
+        document.getElementById('tableWrap').textContent = '读取文件失败：' + err;
+      });
+
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      if (parsedData) copyCSV(parsedData);
+    });
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      if (parsedData) downloadCSV(parsedData);
+    });
+  </script>
+</body>
+
+</html>
