@@ -147,7 +147,7 @@
 
   <script>
     // 固定文本链接
-    const primaryUrl  = 'https://raw.githubusercontent.com/liuyujie714/GaussView/refs/heads/master/GaussVewBonds.txt';
+    const primaryUrl = 'https://raw.githubusercontent.com/liuyujie714/GaussView/refs/heads/master/GaussVewBonds.txt';
     const fallbackUrl = 'https://cdn.jsdelivr.net/gh/liuyujie714/GaussView/GaussVewBonds.txt';
 
     function parseTextToRows(text) {
@@ -220,7 +220,17 @@
 
     function copyCSV(parsed) {
       const csv = rowsToCSV(parsed);
-      navigator.clipboard.writeText(csv).then(() => alert('已复制 CSV 到剪贴板'));
+      const textarea = document.createElement('textarea');
+      textarea.value = csv;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy'); // 兼容旧浏览器
+        alert('已复制 CSV 到剪贴板');
+      } catch (err) {
+        alert('复制失败，请手动复制');
+      }
+      document.body.removeChild(textarea);
     }
 
     function downloadCSV(parsed) {
